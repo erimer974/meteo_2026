@@ -10,7 +10,6 @@ import os
 import logging
 import pandas as pd
 import boto3
-import kaggle
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -20,6 +19,7 @@ RAW_FILENAME = "weatherAUS.csv"
 
 
 def download_from_kaggle(output_dir: str = "data/raw") -> str:
+    import kaggle
     os.makedirs(output_dir, exist_ok=True)
     kaggle.api.dataset_download_files(DATASET_ID, path=output_dir, unzip=True)
     path = os.path.join(output_dir, RAW_FILENAME)

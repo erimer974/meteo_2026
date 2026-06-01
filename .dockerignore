@@ -1,0 +1,37 @@
+# Environnements virtuels Python (très lourds)
+venv/
+venv-train/
+env/
+.venv/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Données locales
+data/
+temp/
+models/
+metrics/
+*.pkl
+*.joblib
+logs/
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Git / IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Dossiers HF Spaces (dépôts séparés)
+meteo-mlflow_HF/
+meteo-model-api_HF/
+meteo-data-api_HF/
+meteo-dashboard_HF/

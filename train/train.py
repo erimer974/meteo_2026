@@ -3,8 +3,8 @@ Circuit 1 — Étape 2 : entraîne le modèle sur les données historiques
 (2008-2015) et logge tout dans MLflow.
 
 Le modèle est un sklearn Pipeline auto-suffisant :
-  ColumnTransformer (imputation + OHE + StandardScaler)
-  + GradientBoostingClassifier
+  ColumnTransformer (imputation + OHE)
+  + HistGradientBoostingClassifier avec sample_weight balancé
 
 Après entraînement, le modèle est enregistré dans le Model Registry
 avec l'alias "challenger". L'alias "production" est attribué manuellement
@@ -24,9 +24,10 @@ from mlflow.models.signature import infer_signature
 
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 load_dotenv()
@@ -64,7 +65,6 @@ def build_pipeline() -> Pipeline:
     ])
     numerical_transformer = Pipeline([
         ("imputer", SimpleImputer(strategy="mean")),
-        ("scaler", StandardScaler()),
     ])
     preprocessor = ColumnTransformer([
         ("cat", categorical_transformer, CATEGORICAL_COLS),
@@ -72,10 +72,12 @@ def build_pipeline() -> Pipeline:
     ])
     return Pipeline([
         ("preprocessor", preprocessor),
-        ("classifier", GradientBoostingClassifier(
-            n_estimators=150,
-            learning_rate=1.0,
-            max_depth=3,
+        ("classifier", HistGradientBoostingClassifier(
+            max_iter=400,
+            learning_rate=0.05,
+            max_depth=6,
+            min_samples_leaf=20,
+            l2_regularization=0.1,
             random_state=42,
         )),
     ])
@@ -100,10 +102,13 @@ def train():
     pipeline = build_pipeline()
     start = time.time()
 
+    # Pondération inversement proportionnelle à la fréquence de chaque classe
+    sample_weight = compute_sample_weight("balanced", y_train)
+
     mlflow.sklearn.autolog(log_models=False)
     with mlflow.start_run() as run:
 
-        pipeline.fit(X_train, y_train)
+        pipeline.fit(X_train, y_train, classifier__sample_weight=sample_weight)
         y_pred = pipeline.predict(X_test)
 
         accuracy  = accuracy_score(y_test, y_pred)
@@ -119,7 +124,7 @@ def train():
         signature = infer_signature(X_train, pipeline.predict(X_train))
         model_info = mlflow.sklearn.log_model(
             sk_model=pipeline,
-            name="model",
+            artifact_path="model",
             registered_model_name=REGISTERED_MODEL_NAME,
             signature=signature,
             input_example=X_train.head(3),
