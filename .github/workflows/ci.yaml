@@ -1,0 +1,55 @@
+name: Meteo MLOps CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-test-etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-tests.txt
+
+      - name: Run tests
+        run: pytest -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          DATA_API_BASE_URL:  ${{ secrets.DATA_API_BASE_URL }}
+          MODEL_API_BASE_URL: ${{ secrets.MODEL_API_BASE_URL }}
+          DATA_API_ENDPOINT:  ${{ vars.DATA_API_ENDPOINT }}
+          MODEL_API_PREDICT_ENDPOINT: ${{ vars.MODEL_API_PREDICT_ENDPOINT }}
+          MODEL_API_TIMEOUT:  ${{ vars.MODEL_API_TIMEOUT }}
+
+      - name: Build Docker image ETL
+        run: docker build -t meteo-etl .
+
+      - name: Run ETL container
+        run: docker run --rm --env-file <(env) meteo-etl
+        env:
+          DATA_API_BASE_URL:  ${{ secrets.DATA_API_BASE_URL }}
+          DATA_API_ENDPOINT:  ${{ vars.DATA_API_ENDPOINT }}
+          DATA_API_BATCH_SIZE: ${{ vars.DATA_API_BATCH_SIZE }}
+          MODEL_API_BASE_URL: ${{ secrets.MODEL_API_BASE_URL }}
+          MODEL_API_PREDICT_ENDPOINT: ${{ vars.MODEL_API_PREDICT_ENDPOINT }}
+          MODEL_API_TIMEOUT:  ${{ vars.MODEL_API_TIMEOUT }}
+          S3_BUCKET_NAME:     ${{ secrets.S3_BUCKET_NAME }}
+          S3_PROD_PREFIX:     ${{ vars.S3_PROD_PREFIX }}
+          AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          DATABASE_URL:       ${{ secrets.DATABASE_URL }}
+          DB_TARGET_TABLE:    ${{ vars.DB_TARGET_TABLE }}

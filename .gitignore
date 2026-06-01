@@ -1,0 +1,38 @@
+# Secrets — ne jamais commiter
+.env
+secrets.txt
+*_accessKeys.csv
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+venv/
+env/
+.venv/
+
+# Artefacts locaux (trop lourds pour git)
+data/
+temp/
+models/
+metrics/
+*.pkl
+*.joblib
+
+# HF Space clones (ont leur propre dépôt git)
+meteo-mlflow/
+meteo-model-api/
+meteo-data-api/
+meteo-dashboard/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
