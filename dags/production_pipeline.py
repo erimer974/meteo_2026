@@ -42,7 +42,6 @@ with DAG(
 
     t1 = PythonOperator(task_id="run_etl",        python_callable=task_run_etl)
     t2 = PythonOperator(task_id="run_monitoring",  python_callable=task_run_monitoring)
-    t3 = PythonOperator(task_id="check_alert",     python_callable=task_check_alert,
-                        provide_context=True)
+    t3 = PythonOperator(task_id="check_alert",     python_callable=task_check_alert)
 
     t1 >> t2 >> t3

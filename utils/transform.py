@@ -37,7 +37,10 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].fillna(df[col].mean())
 
     if "RainToday" in df.columns:
-        df["RainToday"] = df["RainToday"].map({"No": 0, "Yes": 1}).fillna(0).astype(int)
+        if df["RainToday"].dtype == object:
+            df["RainToday"] = df["RainToday"].map({"No": 0, "Yes": 1}).fillna(0).astype(int)
+        else:
+            df["RainToday"] = pd.to_numeric(df["RainToday"], errors="coerce").fillna(0).astype(int)
 
     return df
 

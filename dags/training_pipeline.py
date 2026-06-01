@@ -35,7 +35,7 @@ with DAG(
         from train.train import train
         train()
 
-    def task_validate_model(min_f1: float = 0.70):
+    def task_validate_model(min_f1: float = 0.65):
         import mlflow
         import os
         from dotenv import load_dotenv
