@@ -37,7 +37,6 @@ services:
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
-      # Les APIs internes au réseau docker-compose
       DATA_API_BASE_URL: http://data-api:7860
       MODEL_API_BASE_URL: http://model-api:7860
     volumes:
@@ -50,6 +49,8 @@ services:
     depends_on:
       - data-api
       - model-api
+    profiles:
+      - airflow
 
   etl:
     build: .
