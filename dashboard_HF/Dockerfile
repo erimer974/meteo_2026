@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py app.py
 
-CMD ["bash", "-lc", "fastapi run app.py --host 0.0.0.0 --port ${PORT}"]
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]

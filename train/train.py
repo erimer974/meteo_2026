@@ -100,8 +100,8 @@ def train():
     pipeline = build_pipeline()
     start = time.time()
 
+    mlflow.sklearn.autolog(log_models=False)
     with mlflow.start_run() as run:
-        mlflow.sklearn.autolog(log_models=False)
 
         pipeline.fit(X_train, y_train)
         y_pred = pipeline.predict(X_test)

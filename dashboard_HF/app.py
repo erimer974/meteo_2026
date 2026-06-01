@@ -19,8 +19,11 @@ st.title("Dashboard — Prédictions météo australiennes")
 
 @st.cache_data(ttl=300)
 def load_predictions() -> pd.DataFrame:
-    engine = create_engine(os.environ["DATABASE_URL"])
-    return pd.read_sql("SELECT * FROM meteo_predictions ORDER BY id DESC LIMIT 5000", engine)
+    try:
+        engine = create_engine(os.environ["DATABASE_URL"])
+        return pd.read_sql("SELECT * FROM meteo_predictions ORDER BY id DESC LIMIT 5000", engine)
+    except Exception:
+        return pd.DataFrame()
 
 
 df = load_predictions()

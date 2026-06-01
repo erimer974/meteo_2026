@@ -6,6 +6,7 @@ comme s'il s'agissait d'un flux de données live.
 Source : S3 raw/meteo/prod/weatherAUS_prod.csv
 """
 import os
+import json
 import boto3
 import pandas as pd
 from io import StringIO
@@ -46,9 +47,13 @@ async def current_weather(n: int = Query(default=20, ge=1, le=200)):
     Retourne n lignes aléatoires du dataset de production (2016-2017).
     Simule un flux de données live sans la colonne RainTomorrow.
     """
-    df = _load_prod_data()
-    sample = df.sample(n=min(n, len(df))).reset_index(drop=True)
-    return sample.to_dict(orient="records")
+    from fastapi import HTTPException
+    try:
+        df = _load_prod_data()
+        sample = df.sample(n=min(n, len(df))).reset_index(drop=True)
+        return json.loads(sample.to_json(orient="records"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/info")

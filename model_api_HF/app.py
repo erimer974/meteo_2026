@@ -10,7 +10,16 @@ load_dotenv()
 
 REGISTERED_MODEL_NAME = "rain_tomorrow_detector"
 MODEL_ALIAS = "production"
-MODEL = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL_NAME}@{MODEL_ALIAS}")
+_MODEL = None
+
+
+def get_model():
+    global _MODEL
+    if _MODEL is None:
+        mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+        _MODEL = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL_NAME}@{MODEL_ALIAS}")
+    return _MODEL
+
 
 app = FastAPI(
     title="Meteo Model API",
@@ -52,11 +61,16 @@ async def index():
 
 @app.post("/predict")
 async def predict(features: WeatherFeatures):
-    df = pd.DataFrame([features.model_dump()])
-    prediction = MODEL.predict(df)[0]
-    proba = MODEL.predict_proba(df)[0]
-    return {
-        "prediction": int(prediction),
-        "proba_0": round(float(proba[0]), 4),
-        "proba_1": round(float(proba[1]), 4),
-    }
+    from fastapi import HTTPException
+    try:
+        model = get_model()
+        df = pd.DataFrame([features.model_dump()])
+        prediction = model.predict(df)[0]
+        proba = model.predict_proba(df)[0]
+        return {
+            "prediction": int(prediction),
+            "proba_0": round(float(proba[0]), 4),
+            "proba_1": round(float(proba[1]), 4),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
