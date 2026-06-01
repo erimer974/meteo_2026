@@ -25,6 +25,7 @@ models/
 metrics/
 *.pkl
 *.joblib
+logs/
 
 # HF Space clones (ont leur propre dépôt git)
 meteo-mlflow_HF/

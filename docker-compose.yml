@@ -1,3 +1,45 @@
+version: "3.8"
+
+# ── Ancre Airflow commune ────────────────────────────────────────────────────
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1-python3.11
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DB_URL}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "meteo-mlops-secret-key"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    PYTHONPATH: /opt/airflow
+    # Packages installés au démarrage (évite un build custom)
+    _PIP_ADDITIONAL_REQUIREMENTS: >-
+      mlflow>=2.12 scikit-learn==1.7.2 boto3>=1.34
+      pandas>=2.0 requests>=2.31 python-dotenv>=1.0
+      kaggle>=1.6 evidently>=0.4
+    # URLs internes docker-compose
+    DATA_API_BASE_URL: http://data-api:7860
+    MODEL_API_BASE_URL: http://model-api:7860
+    # Variables AWS + MLflow depuis .env
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+    S3_RAW_PREFIX: ${S3_RAW_PREFIX}
+    S3_PROD_PREFIX: ${S3_PROD_PREFIX}
+    DATABASE_URL: ${DATABASE_URL}
+    DB_TARGET_TABLE: ${DB_TARGET_TABLE}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./train:/opt/airflow/train
+    - ./utils:/opt/airflow/utils
+    - ./monitoring:/opt/airflow/monitoring
+    - ./etl.py:/opt/airflow/etl.py
+  user: "${AIRFLOW_UID:-50000}:0"
+
+# ── Services principaux ───────────────────────────────────────────────────────
 services:
 
   data-api:
@@ -5,12 +47,24 @@ services:
     ports:
       - "8001:7860"
     env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   model-api:
     build: ./model_api
     ports:
       - "8002:7860"
     env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   dashboard:
     build: ./dashboard
@@ -18,40 +72,57 @@ services:
       - "8501:7860"
     env_file: .env
     depends_on:
-      - data-api
-      - model-api
+      data-api:
+        condition: service_healthy
+      model-api:
+        condition: service_healthy
 
-  airflow:
-    build: ./airflow
-    ports:
-      - "8080:8080"
-    env_file: .env
+# ── Airflow (profil séparé) ───────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    command: version
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DB_URL}
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW__WEBSERVER__SECRET_KEY: "meteo-mlops-secret-key"
-      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
-      PYTHONPATH: /opt/airflow
+      <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
-      DATA_API_BASE_URL: http://data-api:7860
-      MODEL_API_BASE_URL: http://model-api:7860
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./train:/opt/airflow/train
-      - ./utils:/opt/airflow/utils
-      - ./monitoring:/opt/airflow/monitoring
-      - ./etl.py:/opt/airflow/etl.py
-    command: standalone
-    depends_on:
-      - data-api
-      - model-api
     profiles:
       - airflow
 
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 2m
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    profiles:
+      - airflow
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 2m
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    profiles:
+      - airflow
+
+# ── ETL (profil séparé) ───────────────────────────────────────────────────────
   etl:
     build: .
     env_file: .env
@@ -59,7 +130,9 @@ services:
       DATA_API_BASE_URL: http://data-api:7860
       MODEL_API_BASE_URL: http://model-api:7860
     depends_on:
-      - data-api
-      - model-api
+      data-api:
+        condition: service_healthy
+      model-api:
+        condition: service_healthy
     profiles:
       - etl
