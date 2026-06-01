@@ -1,19 +1,19 @@
 services:
 
   data-api:
-    build: ./data_api_HF
+    build: ./data_api
     ports:
       - "8001:7860"
     env_file: .env
 
   model-api:
-    build: ./model_api_HF
+    build: ./model_api
     ports:
       - "8002:7860"
     env_file: .env
 
   dashboard:
-    build: ./dashboard_HF
+    build: ./dashboard
     ports:
       - "8501:7860"
     env_file: .env
