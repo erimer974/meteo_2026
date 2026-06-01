@@ -12,15 +12,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
     PYTHONPATH: /opt/airflow
-    # Packages installés au démarrage (évite un build custom)
     _PIP_ADDITIONAL_REQUIREMENTS: >-
       mlflow>=2.12 scikit-learn==1.7.2 boto3>=1.34
       pandas>=2.0 requests>=2.31 python-dotenv>=1.0
       kaggle>=1.6 evidently>=0.4
-    # URLs internes docker-compose
     DATA_API_BASE_URL: http://data-api:7860
     MODEL_API_BASE_URL: http://model-api:7860
-    # Variables AWS + MLflow depuis .env
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -47,24 +44,12 @@ services:
     ports:
       - "8001:7860"
     env_file: .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
   model-api:
     build: ./model_api
     ports:
       - "8002:7860"
     env_file: .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
 
   dashboard:
     build: ./dashboard
@@ -72,10 +57,8 @@ services:
       - "8501:7860"
     env_file: .env
     depends_on:
-      data-api:
-        condition: service_healthy
-      model-api:
-        condition: service_healthy
+      - data-api
+      - model-api
 
 # ── Airflow (profil séparé) ───────────────────────────────────────────────────
   airflow-init:
@@ -95,12 +78,6 @@ services:
     command: webserver
     ports:
       - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 2m
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -110,12 +87,6 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
-    healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 2m
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -130,9 +101,7 @@ services:
       DATA_API_BASE_URL: http://data-api:7860
       MODEL_API_BASE_URL: http://model-api:7860
     depends_on:
-      data-api:
-        condition: service_healthy
-      model-api:
-        condition: service_healthy
+      - data-api
+      - model-api
     profiles:
       - etl
