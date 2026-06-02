@@ -203,33 +203,81 @@ Les URLs des APIs sont injectées via variables d'environnement (`DATA_API_BASE_
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/ci.yaml`) déclenché sur chaque push/PR sur `main` :
+Deux workflows GitHub Actions enchaînés : `push/PR → CI → (sur main, si verte) → CD`.
+
+### CI — `.github/workflows/ci.yaml`
+
+Déclenché sur chaque push/PR sur `main` :
 
 1. Installation des dépendances
-2. Exécution des tests pytest
+2. Exécution des tests `pytest` (unitaires + validation de données via `pandas.testing`)
 3. Build de l'image Docker ETL
 4. Run du conteneur ETL en intégration
 
-Les secrets (`AWS_*`, `DATABASE_URL`, URLs des APIs) sont configurés dans les Settings GitHub du repo.
+### CD — `.github/workflows/deploy-hf.yml`
+
+Déclenché automatiquement **à la fin d'une CI verte sur `main`** (`workflow_run`), ou
+manuellement (*Run workflow*). Pour chaque service (`mlflow`, `data_api`, `model_api`,
+`dashboard`), pousse le dossier source vers le Space HF correspondant **si son contenu a
+changé** (sinon no-op), en préservant le `README` de configuration du Space.
+
+Secrets GitHub requis : `AWS_*`, `DATABASE_URL`, URLs des APIs (CI) et **`HF_TOKEN`** (CD).
 
 ---
 
-## Déploiement HuggingFace Spaces (optionnel)
+## Services déployés (HuggingFace Spaces)
 
-Chaque service dispose d'un dossier `*_HF/` contenant le Dockerfile adapté pour HF Spaces (port 7860).
+Les 4 services tournent en ligne (déploiement continu via la CD). URLs publiques :
 
-| Service | Space HF |
-|---|---|
-| MLflow | `meteo-mlflow_HF/` → `erimer974-meteo-mlflow.hf.space` |
-| Data API | `meteo-data-api_HF/` → `erimer974-meteo-data-api.hf.space` |
-| Model API | `meteo-model-api_HF/` → `erimer974-meteo-model-api.hf.space` |
-| Dashboard | `meteo-dashboard_HF/` → `erimer974-meteo-dashboard.hf.space` |
+| Service | URL en ligne | Usage |
+|---|---|---|
+| **MLflow** | https://erimer974-meteo-mlflow.hf.space | UI tracking + Model Registry (experiments, runs, alias `production`) |
+| **Data API** | https://erimer974-meteo-data-api.hf.space/docs | Flux météo simulé — `/current-weather`, `/info` |
+| **Model API** | https://erimer974-meteo-model-api.hf.space/docs | Prédictions — `POST /predict` |
+| **Dashboard** | https://erimer974-meteo-dashboard.hf.space | Visualisation Streamlit des prédictions |
 
-Pour basculer de local vers HF, modifier dans `.env` :
+### Utiliser les services en ligne
+
+**Récupérer des données météo simulées :**
+
+```bash
+curl "https://erimer974-meteo-data-api.hf.space/current-weather?n=5"
+```
+
+**Faire une prédiction (pluie demain ? 0/1 + probabilités) :**
+
+```bash
+curl -X POST https://erimer974-meteo-model-api.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{"Location":"Sydney","MinTemp":13.4,"MaxTemp":22.9,"Rainfall":0.6,
+       "WindGustDir":"W","WindDir9am":"W","WindDir3pm":"WNW",
+       "RainToday":0,"Month":1,"Day":1}'
+# → {"prediction":0,"proba_0":0.83,"proba_1":0.17}
+```
+
+Documentation interactive (Swagger) sur `/docs` pour chaque API. Le **dashboard** et
+l'**UI MLflow** s'ouvrent directement dans le navigateur via leurs URLs.
+
+### Basculer le pipeline local vers le cloud
+
+Pour que l'ETL/Airflow utilisent les services **hébergés** plutôt que les conteneurs
+locaux, pointer ces variables de `.env` vers les URLs HF :
 
 ```bash
 MLFLOW_TRACKING_URI=https://erimer974-meteo-mlflow.hf.space
+MODEL_API_BASE_URL=https://erimer974-meteo-model-api.hf.space
+DATA_API_BASE_URL=https://erimer974-meteo-data-api.hf.space
 ```
+
+### Déploiement et secrets
+
+- Le déploiement est **automatique** : tout merge sur `main` (CI verte) pousse les
+  services modifiés vers leurs Spaces (voir [CI/CD](#cicd)).
+- Chaque Space lit ses propres **secrets côté HuggingFace** (Settings du Space →
+  *Variables and secrets*) : `AWS_*`, `DATABASE_URL`, `MLFLOW_TRACKING_URI`, préfixes S3…
+  La CD pousse le **code**, pas les secrets — ceux-ci se configurent une fois sur HF.
+- Les dossiers locaux `*_HF/` sont des clones des Spaces (dépôts git séparés) ; la source
+  de vérité reste les dossiers `mlflow/`, `data_api/`, `model_api/`, `dashboard/` du repo.
 
 ---
 
