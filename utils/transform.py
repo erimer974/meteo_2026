@@ -37,10 +37,13 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].fillna(df[col].mean())
 
     if "RainToday" in df.columns:
-        if df["RainToday"].dtype == object:
-            df["RainToday"] = df["RainToday"].map({"No": 0, "Yes": 1}).fillna(0).astype(int)
-        else:
+        # Robuste aux versions de pandas : en pandas 3.0 les chaînes ont un dtype
+        # `str` dédié (≠ object), donc on teste le caractère numérique plutôt que
+        # `dtype == object` (sinon "Yes"/"No" seraient coercés en NaN -> 0).
+        if pd.api.types.is_numeric_dtype(df["RainToday"]):
             df["RainToday"] = pd.to_numeric(df["RainToday"], errors="coerce").fillna(0).astype(int)
+        else:
+            df["RainToday"] = df["RainToday"].map({"No": 0, "Yes": 1}).fillna(0).astype(int)
 
     return df
 
