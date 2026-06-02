@@ -63,7 +63,7 @@ cp .env.example .env
 | `S3_PROD_PREFIX` | Préfixe S3 données production (ex : `production/meteo`) |
 | `DATABASE_URL` | URL Neon Postgres — prédictions (postgresql://...) |
 | `AIRFLOW_DB_URL` | URL Neon Postgres — Airflow metadata (postgresql+psycopg2://...) |
-| `MLFLOW_TRACKING_URI` | `http://mlflow:5000` en local, URL HF Spaces en prod |
+| `MLFLOW_TRACKING_URI` | `http://mlflow:7860` en local (port **interne** du conteneur ; `5000` n'est que le mapping hôte de l'UI), URL HF Spaces en prod |
 | `MLFLOW_ARTIFACT_ROOT` | Chemin S3 artefacts MLflow (ex : `s3://bucket/mlflow-artifacts`) |
 
 ---
