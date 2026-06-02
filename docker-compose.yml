@@ -10,10 +10,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
     PYTHONPATH: /opt/airflow
+    # NB : ne PAS ajouter sqlalchemy/psycopg2 ici — Airflow épingle SQLAlchemy 1.4
+    # (un bump en 2.0 casse son ORM). monitor.py se contente de la 1.4 fournie.
     _PIP_ADDITIONAL_REQUIREMENTS: >-
       mlflow>=2.12,<3.0 scikit-learn==1.7.2 boto3>=1.34
       pandas>=2.0 requests>=2.31 python-dotenv>=1.0
-      kaggle>=1.6
+      kaggle>=1.6 evidently>=0.4.11,<0.5
     DATA_API_BASE_URL: http://data-api:7860
     MODEL_API_BASE_URL: http://model-api:7860
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}

@@ -30,9 +30,10 @@ with DAG(
         from etl import run_pipeline
         run_pipeline()
 
-    def task_run_monitoring():
+    def task_run_monitoring(**context):
         from monitoring.monitor import run_monitoring
-        run_monitoring()
+        result = run_monitoring()
+        context["ti"].xcom_push(key="drift_detected", value=bool(result["drift_detected"]))
 
     def task_check_alert(**context):
         drift_detected = context["ti"].xcom_pull(task_ids="run_monitoring", key="drift_detected")
