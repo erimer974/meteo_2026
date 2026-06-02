@@ -33,4 +33,5 @@ CMD mlflow server --port 7860 \
 --host 0.0.0.0 \
 --backend-store-uri $BACKEND_STORE_URI \
 --default-artifact-root $ARTIFACT_ROOT \
---allowed-hosts "*"
+--allowed-hosts "*" \
+--cors-allowed-origins "https://erimer974-meteo-mlflow.hf.space"
