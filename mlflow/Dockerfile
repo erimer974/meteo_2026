@@ -22,6 +22,13 @@ COPY --chown=user . $HOME/app
 
 RUN pip install -r requirements.txt
 
+# Variables injectées au runtime (HF Spaces secrets / docker-compose environment).
+# Déclarées ici pour parité avec le Space HF ; écrasées par l'env d'exécution.
+ENV AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+ENV AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+ENV BACKEND_STORE_URI=$BACKEND_STORE_URI
+ENV ARTIFACT_ROOT=$ARTIFACT_ROOT
+
 CMD mlflow server --port 7860 \
 --host 0.0.0.0 \
 --backend-store-uri $BACKEND_STORE_URI \
