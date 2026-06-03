@@ -218,11 +218,9 @@ subgraph C1["Circuit 1 — Entraînement  (données historiques labellisées)"]
 
   subgraph CICD["CI/CD — GitHub Actions"]
     direction TB
-    LINT["Lint + type check\\nflake8 · mypy"]
-    UNIT["Tests unitaires\\npytest · coverage"]
-    INTEG["Tests d'intégration\\nAPI · pipeline · données"]
-    TPERF["Tests de performance\\nlatence · throughput"]
-    LINT --> UNIT --> INTEG --> TPERF
+    UNIT["Tests unitaires\\npytest (21 tests)"]
+    DEPLOY["Build + déploiement\\ndocker · HF Spaces"]
+    UNIT --> DEPLOY
   end
 
   DWH1    -->|"① données entraînement"| TRAIN
@@ -257,10 +255,8 @@ subgraph C2["Circuit 2 — Serving  (données live / production)"]
   subgraph MONITOR["Monitoring — EvidentlyAI"]
     direction LR
     DRIFT["Data drift\\ndistribution features"]
-    PMON["Perf. modèle\\nprécision · F1"]
     ALERT["Alertes\\nretraining trigger"]
     DRIFT --> ALERT
-    PMON  --> ALERT
   end
 
   subgraph DASH["Dashboard — Streamlit"]
@@ -274,14 +270,13 @@ subgraph C2["Circuit 2 — Serving  (données live / production)"]
   CACHE   -->|"⑤ stockage résultats"| BDD
   DWH2    -->|"Load pour dashboard"| LOAD_S
   BDD     -->|"⑥ feed monitoring"| DRIFT
-  BDD     -->|"⑥ feed monitoring"| PMON
 end
 
 %% ════════════════════════════════════════════════════════
 %% CONNEXIONS INTER-CIRCUITS
 %% ════════════════════════════════════════════════════════
 
-TPERF   -->|"✓ validé → déploiement"| API
+DEPLOY  -->|"✓ CI verte → déploiement"| API
 ALERT   -->|"⑦ retraining trigger\\n→ relance Circuit 1"| SRC_H
 ALERT   -->|"notif"| VIZ
 
@@ -305,10 +300,8 @@ style EVAL    fill:#1e2f50,stroke:#818cf8,color:#e2e8f0
 style MLFLOW  fill:#2a1a4a,stroke:#a78bfa,color:#e2e8f0
 
 style CICD    fill:#2a1a0d,stroke:#fbbf24,color:#e2e8f0
-style LINT    fill:#382210,stroke:#fbbf24,color:#e2e8f0
 style UNIT    fill:#382210,stroke:#fbbf24,color:#e2e8f0
-style INTEG   fill:#382210,stroke:#fbbf24,color:#e2e8f0
-style TPERF   fill:#382210,stroke:#fbbf24,color:#e2e8f0
+style DEPLOY  fill:#382210,stroke:#fbbf24,color:#e2e8f0
 
 style AF2     fill:#0d2818,stroke:#10b981,color:#e2e8f0
 style SRC_L   fill:#1a3a28,stroke:#2dd4bf,color:#e2e8f0
@@ -323,7 +316,6 @@ style BDD     fill:#1a2a1a,stroke:#4ade80,color:#e2e8f0
 
 style MONITOR fill:#3a0d0d,stroke:#fb7185,color:#e2e8f0
 style DRIFT   fill:#4a1a1a,stroke:#fb7185,color:#e2e8f0
-style PMON    fill:#4a1a1a,stroke:#fb7185,color:#e2e8f0
 style ALERT   fill:#4a1a1a,stroke:#fb7185,color:#e2e8f0
 
 style DASH    fill:#0d2a0d,stroke:#86efac,color:#e2e8f0
