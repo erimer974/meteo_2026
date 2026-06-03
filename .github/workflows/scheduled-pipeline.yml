@@ -1,0 +1,61 @@
+name: Scheduled Production Pipeline
+
+# Ordonnancement SERVERLESS du pipeline (remplace le scheduler Airflow local).
+# Tourne sur les runners GitHub : aucune machine ni Docker à garder allumé.
+# Appelle les Spaces HuggingFace (data-api, model-api, mlflow) toujours en ligne.
+on:
+  schedule:
+    - cron: "0 6 * * *"   # tous les jours à 6h00 UTC
+  workflow_dispatch:        # + déclenchement manuel (onglet Actions → Run workflow)
+
+# Un seul run à la fois (évite les exécutions concurrentes qui écriraient en base).
+concurrency:
+  group: scheduled-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-pipeline.txt
+
+      - name: Run pipeline (ETL → monitoring → retraining si drift)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          # Endpoints : pointer vers les Spaces HF (toujours en ligne)
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          DATA_API_BASE_URL:   ${{ secrets.DATA_API_BASE_URL }}
+          MODEL_API_BASE_URL:  ${{ secrets.MODEL_API_BASE_URL }}
+          # AWS / S3
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    ${{ secrets.AWS_DEFAULT_REGION }}
+          S3_BUCKET_NAME:        ${{ secrets.S3_BUCKET_NAME }}
+          S3_RAW_PREFIX:         ${{ vars.S3_RAW_PREFIX }}
+          S3_PROD_PREFIX:        ${{ vars.S3_PROD_PREFIX }}
+          # Base de données (prédictions + backend MLflow)
+          DATABASE_URL:    ${{ secrets.DATABASE_URL }}
+          DB_TARGET_TABLE: ${{ vars.DB_TARGET_TABLE }}
+          # Paramètres data-api / model-api
+          DATA_API_ENDPOINT:          ${{ vars.DATA_API_ENDPOINT }}
+          DATA_API_BATCH_SIZE:        ${{ vars.DATA_API_BATCH_SIZE }}
+          MODEL_API_PREDICT_ENDPOINT: ${{ vars.MODEL_API_PREDICT_ENDPOINT }}
+          MODEL_API_TIMEOUT:          ${{ vars.MODEL_API_TIMEOUT }}
+          # Seuil de drift (défaut 0.5 si la variable n'existe pas)
+          DRIFT_SHARE_THRESHOLD: ${{ vars.DRIFT_SHARE_THRESHOLD || '0.5' }}
+          # Kaggle (optionnel : si absent, le retraining réutilise les données S3)
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY:      ${{ secrets.KAGGLE_KEY }}
+        run: python scheduled_pipeline.py
