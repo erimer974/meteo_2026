@@ -145,11 +145,14 @@ GET  /info                → métadonnées du dataset
 FastAPI qui charge le modèle tagué `production` depuis le MLflow Registry et expose une route de prédiction.
 
 ```
-GET  /                    → statut
-POST /predict             → prédiction RainTomorrow (0/1 + probabilités)
+GET  /                    → statut (+ version du modèle chargé)
+POST /predict             → prédiction RainTomorrow (0/1 + probabilités + model_version)
+POST /reload              → recharge la version `production` (appelé après un promote)
 ```
 
-Le modèle est chargé au premier appel (lazy loading).
+Le modèle est chargé au premier appel (lazy loading) puis mis en cache. Après un
+retraining, le DAG `training_pipeline` appelle `POST /reload` pour que le service
+serve immédiatement la nouvelle version `production` (sinon l'ancienne resterait en cache).
 
 ### Dashboard (`./dashboard`)
 
@@ -162,7 +165,7 @@ Application Streamlit de visualisation des prédictions et des métriques de dri
 DAG Airflow : `training_pipeline` (déclenchement manuel ou par le monitoring)
 
 ```
-prepare_data → train_model → validate_model → promote
+prepare_data → train_model → validate_model → promote → refresh_model_api
 ```
 
 | Tâche | Description |
@@ -171,6 +174,7 @@ prepare_data → train_model → validate_model → promote
 | `train_model` | Entraîne un `HistGradientBoostingClassifier` avec `sample_weight` balancé, logge dans MLflow, enregistre avec l'alias `challenger` |
 | `validate_model` | Vérifie que le F1-score du challenger dépasse le seuil (0.65) |
 | `promote` | Attribue l'alias `production` au modèle validé dans le MLflow Registry |
+| `refresh_model_api` | Appelle `POST {MODEL_API_BASE_URL}/reload` pour que le model-api serve la nouvelle version (non bloquant) |
 
 **Lancer manuellement via l'UI Airflow :**
 1. Aller sur http://localhost:8080
@@ -190,7 +194,7 @@ run_etl → run_monitoring → check_alert
 | Tâche | Description |
 |---|---|
 | `run_etl` | Appelle la data-api, transforme (nettoyage + prédiction via model-api), charge dans Neon + S3 |
-| `run_monitoring` | Analyse le drift EvidentlyAI (comparaison prédictions vs vérité terrain S3 monitor) |
+| `run_monitoring` | Analyse le drift EvidentlyAI (comparaison prédictions vs vérité terrain S3 monitor) ; rapport HTML sur S3 |
 | `check_alert` | Si drift détecté, déclenche automatiquement `training_pipeline` |
 
 ---

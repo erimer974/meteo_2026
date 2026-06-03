@@ -3,7 +3,7 @@ Circuit 2 — DAG Airflow : pipeline de production (serving).
 
 Tâches :
   1. run_etl       → extract (data-api) → transform (/predict) → load (S3 + Postgres)
-  2. run_monitoring → EvidentlyAI : drift + performance
+  2. run_monitoring → EvidentlyAI : drift des features
   3. check_alert   → si drift détecté, déclenche le DAG training_pipeline
 """
 from datetime import datetime, timedelta
