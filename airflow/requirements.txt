@@ -1,3 +1,5 @@
+# Dépendances Airflow — miroir exact de _PIP_ADDITIONAL_REQUIREMENTS (docker-compose).
+# Tenir synchronisé avec le compose. Ne PAS épingler sqlalchemy>=2.0 (cf. Dockerfile).
 mlflow>=2.12,<3.0
 scikit-learn==1.7.2
 boto3>=1.34
@@ -5,3 +7,4 @@ pandas>=2.0
 requests>=2.31
 python-dotenv>=1.0
 kaggle>=1.6
+evidently>=0.4.11,<0.5

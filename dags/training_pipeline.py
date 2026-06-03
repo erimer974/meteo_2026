@@ -58,9 +58,32 @@ with DAG(
         version = client.get_model_version_by_alias("rain_tomorrow_detector", "challenger")
         client.set_registered_model_alias("rain_tomorrow_detector", "production", version.version)
 
-    t1 = PythonOperator(task_id="prepare_data",   python_callable=task_prepare_data)
-    t2 = PythonOperator(task_id="train_model",    python_callable=task_train_model)
-    t3 = PythonOperator(task_id="validate_model", python_callable=task_validate_model)
-    t4 = PythonOperator(task_id="promote",        python_callable=task_promote)
+    def task_refresh_model_api():
+        """
+        Force le model-api à recharger la nouvelle version 'production'.
+        Sans ça, le service continue de servir l'ancien modèle en cache.
+        Non bloquant : un échec (service down) ne doit pas faire échouer la promo.
+        """
+        import os
+        import logging
+        import requests
+        from dotenv import load_dotenv
+        load_dotenv()
+        base = os.environ.get("MODEL_API_BASE_URL")
+        if not base:
+            logging.warning("MODEL_API_BASE_URL absent — reload du model-api ignoré.")
+            return
+        try:
+            resp = requests.post(f"{base}/reload", timeout=120)
+            resp.raise_for_status()
+            logging.info(f"model-api rechargé : {resp.json()}")
+        except Exception as e:
+            logging.warning(f"Reload du model-api échoué (non bloquant) : {e}")
 
-    t1 >> t2 >> t3 >> t4
+    t1 = PythonOperator(task_id="prepare_data",     python_callable=task_prepare_data)
+    t2 = PythonOperator(task_id="train_model",      python_callable=task_train_model)
+    t3 = PythonOperator(task_id="validate_model",   python_callable=task_validate_model)
+    t4 = PythonOperator(task_id="promote",          python_callable=task_promote)
+    t5 = PythonOperator(task_id="refresh_model_api", python_callable=task_refresh_model_api)
+
+    t1 >> t2 >> t3 >> t4 >> t5
