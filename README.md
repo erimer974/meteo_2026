@@ -117,9 +117,18 @@ docker compose --profile airflow down
 
 Serveur de tracking MLflow avec backend Neon PostgreSQL et artefacts sur S3.
 
-- Backend : `DATABASE_URL` (Neon)
-- Artefacts : `MLFLOW_ARTIFACT_ROOT` (S3)
+- Backend : `BACKEND_STORE_URI` = **le même Neon que `DATABASE_URL`**
+- Artefacts : `ARTIFACT_ROOT` = **le même S3 que `MLFLOW_ARTIFACT_ROOT`**
 - Port conteneur : 7860 → mappé sur 5000 en local
+
+> **Source de vérité unique (UI local == UI HF).** Le conteneur local et le Space
+> HF font tourner le *même* binaire (`mlflow server`), mais affichent les mêmes
+> runs/modèles **uniquement si leur `BACKEND_STORE_URI` pointe vers la même base
+> Neon** (les artefacts sont déjà mutualisés sur le même bucket S3). En local,
+> `docker-compose` injecte `BACKEND_STORE_URI: ${DATABASE_URL}`. Côté HF, le secret
+> `BACKEND_STORE_URI` du Space **doit valoir exactement la même URL** que `DATABASE_URL`,
+> et `ARTIFACT_ROOT` la même valeur que `MLFLOW_ARTIFACT_ROOT`. Toute divergence de ces
+> deux secrets fait diverger les deux UI (cause historique du bug « run non visible »).
 
 ### Data API (`./data_api`)
 
@@ -276,6 +285,12 @@ DATA_API_BASE_URL=https://erimer974-meteo-data-api.hf.space
 - Chaque Space lit ses propres **secrets côté HuggingFace** (Settings du Space →
   *Variables and secrets*) : `AWS_*`, `DATABASE_URL`, `MLFLOW_TRACKING_URI`, préfixes S3…
   La CD pousse le **code**, pas les secrets — ceux-ci se configurent une fois sur HF.
+- **Space `meteo-mlflow`** — pour que son UI affiche les mêmes runs que le MLflow
+  local, ses secrets doivent être :
+  - `BACKEND_STORE_URI` = **la valeur exacte de `DATABASE_URL`** du `.env` local
+    (même base Neon `neondb`) ;
+  - `ARTIFACT_ROOT` = `s3://meteo-mlops-2026/mlflow-artifacts` (= `MLFLOW_ARTIFACT_ROOT`) ;
+  - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (lecture/écriture des artefacts S3).
 - Les dossiers locaux `*_HF/` sont des clones des Spaces (dépôts git séparés) ; la source
   de vérité reste les dossiers `mlflow/`, `data_api/`, `model_api/`, `dashboard/` du repo.
 
