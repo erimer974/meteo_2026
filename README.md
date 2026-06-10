@@ -197,6 +197,11 @@ run_etl → run_monitoring → check_alert
 | `run_monitoring` | Analyse le drift EvidentlyAI (comparaison prédictions vs vérité terrain S3 monitor) ; rapport HTML sur S3 |
 | `check_alert` | Si drift détecté, déclenche automatiquement `training_pipeline` |
 
+### Ordonnancement : deux modes
+
+- **Local (Airflow)** : le DAG `production_pipeline` est planifié par le scheduler Airflow (`docker compose --profile airflow up -d`), utile en développement.
+- **Serverless (production) — recommandé** : le workflow GitHub Actions `scheduled-pipeline.yml` exécute le même pipeline via `scheduled_pipeline.py` sur les runners GitHub (cron quotidien 6h UTC), **sans aucune machine ni Docker à garder allumé**. Il vise directement les Spaces HuggingFace (toujours en ligne). Voir [CI/CD](#cicd).
+
 ---
 
 ## Tests
@@ -216,7 +221,7 @@ Les URLs des APIs sont injectées via variables d'environnement (`DATA_API_BASE_
 
 ## CI/CD
 
-Deux workflows GitHub Actions enchaînés : `push/PR → CI → (sur main, si verte) → CD`.
+Trois workflows GitHub Actions. Les deux premiers s'enchaînent : `push/PR → CI → (sur main, si verte) → CD`. Le troisième (`scheduled-pipeline`) tourne de façon indépendante sur un cron quotidien.
 
 ### CI — `.github/workflows/ci.yaml`
 
@@ -235,6 +240,24 @@ manuellement (*Run workflow*). Pour chaque service (`mlflow`, `data_api`, `model
 changé** (sinon no-op), en préservant le `README` de configuration du Space.
 
 Secrets GitHub requis : `AWS_*`, `DATABASE_URL`, URLs des APIs (CI) et **`HF_TOKEN`** (CD).
+
+### Pipeline planifié — `.github/workflows/scheduled-pipeline.yml`
+
+**Ordonnancement serverless** du pipeline de production : remplace le scheduler Airflow
+pour la production. Déclenché chaque jour à **6h00 UTC** (`cron: "0 6 * * *"`) ou
+manuellement (*Run workflow*), avec `concurrency` pour éviter les exécutions concurrentes.
+
+Exécute `scheduled_pipeline.py` sur un runner GitHub (Python 3.11, `requirements-pipeline.txt`),
+qui reproduit les deux circuits sans Airflow ni machine allumée :
+
+1. **Circuit 2** — ETL (`run_pipeline`) puis monitoring de drift (`run_monitoring`) ;
+2. **Circuit 1**, **uniquement si drift détecté** — retraining → `validate` (seuil F1) →
+   `promote` (alias `production`) → `reload` du model-api.
+
+Tous les appels réseau visent les Spaces HuggingFace (toujours en ligne). Secrets/variables
+GitHub requis : `MLFLOW_TRACKING_URI`, `DATA_API_BASE_URL`, `MODEL_API_BASE_URL`, `AWS_*`,
+`S3_*`, `DATABASE_URL`, `DRIFT_SHARE_THRESHOLD`, et `KAGGLE_*` (optionnels — si absents, le
+retraining réutilise les données déjà sur S3).
 
 ---
 
@@ -322,7 +345,9 @@ DATA_API_BASE_URL=https://erimer974-meteo-data-api.hf.space
 ├── mlflow/                  # Serveur MLflow
 ├── airflow/                 # Image Airflow custom
 ├── tests/                   # Tests pytest
+├── .github/workflows/       # CI, CD (HF) et pipeline planifié (cron)
 ├── etl.py                   # Point d'entrée ETL
+├── scheduled_pipeline.py    # Pipeline serverless (Circuits 1+2 hors Airflow)
 ├── docker-compose.yml       # Orchestration Docker
 └── .env                     # Variables d'environnement (non versionné)
 ```
