@@ -38,3 +38,8 @@ meteo-dashboard_HF/
 Thumbs.db
 .vscode/
 .idea/
+
+# Documentation locale (hors versionnement)
+fiches/
+rapport/
+mlops_architecture.html
