@@ -288,8 +288,16 @@ curl -X POST https://erimer974-meteo-model-api.hf.space/predict \
   -d '{"Location":"Sydney","MinTemp":13.4,"MaxTemp":22.9,"Rainfall":0.6,
        "WindGustDir":"W","WindDir9am":"W","WindDir3pm":"WNW",
        "RainToday":0,"Month":1,"Day":1}'
-# → {"prediction":0,"proba_0":0.83,"proba_1":0.17}
+# → {"prediction":0,"proba_0":0.5147,"proba_1":0.4853,"model_version":"6"}
 ```
+
+> **Valeurs indicatives.** Le modèle est réentraîné automatiquement dès qu'une dérive
+> dépasse le seuil : `model_version` et les probabilités évoluent d'une version à l'autre.
+>
+> Cet exemple ne renseigne que 10 des 23 variables acceptées. Les absentes — dont
+> `Humidity3pm`, `Pressure3pm` et `Cloud3pm`, les plus prédictives — sont remplacées par
+> leur moyenne d'entraînement, d'où une prédiction peu tranchée. Les fournir donne un
+> résultat nettement plus net.
 
 Documentation interactive (Swagger) sur `/docs` pour chaque API. Le **dashboard** et
 l'**UI MLflow** s'ouvrent directement dans le navigateur via leurs URLs.
