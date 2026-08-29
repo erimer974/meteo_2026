@@ -99,4 +99,4 @@ else:
         "Sur HuggingFace, vérifiez que le Space dispose des secrets `S3_BUCKET_NAME` et `AWS_*`."
     )
 
-st.caption("Données rafraîchies toutes les 5 minutes — monitoring EvidentlyAI intégré")
+st.caption("Données produites quotidiennement (06:00 UTC) — monitoring EvidentlyAI intégré")
